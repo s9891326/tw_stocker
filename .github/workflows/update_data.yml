@@ -25,7 +25,7 @@ jobs:
           poetry install --no-root
 
       - name: Update data
-        run: python update.py
+        run: poetry run python update.py
 
       - name: Commit and push if changes
         run: |

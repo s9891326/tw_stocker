@@ -9,20 +9,13 @@ packages = [{ include = "", from = "." }]
 
 
 [tool.poetry.dependencies]
-python = "^3.10"
-#twstock = "*"
-# vectorbt = "*"
-# lxml = "*"
-# fta = "*"
-# jinja2 = "*"
-# pandas = "*"
-# requests = "*"
-# nlp2 = "*"
+python = "^3.11"
 twstock = "^1.4.0"
 pandas = "^2.3.3"
 pytz = "^2025.2"
 jinja2 = "^3.1.6"
 lxml = "^6.0.2"
+nlp2 = "^1.9.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"

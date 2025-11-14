@@ -16,7 +16,8 @@
             // "program": "${workspaceFolder}\\svc-cron-statement",
             // "program": "${workspaceFolder}\\svc-statement",
             // "program": "${workspaceFolder}\\botMyanmar\\gcpAPI.py",
-            "program": "${workspaceFolder}\\update.py",
+            // "program": "${workspaceFolder}\\update.py",
+            "program": "${workspaceFolder}\\recommend.py",
             "cwd": "${workspaceFolder}",
             "env": {
                 // python

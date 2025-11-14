@@ -1,10 +1,9 @@
 name: Update Data
 
-
-#on:
-#  schedule:
-#    - cron: '0 6 * * *'  # 每天UTC時間6點執行，即UTC+8時間下午2點
-#  workflow_dispatch:
+on:
+ schedule:
+   - cron: '0 6 * * *'  # 每天UTC時間6點執行，即UTC+8時間下午2點
+ workflow_dispatch:
 
 
 jobs:
@@ -20,7 +19,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install poetry
+          poetry install
 
       - name: Update data
         run: python update.py

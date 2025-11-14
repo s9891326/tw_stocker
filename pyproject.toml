@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "tw-stocker"
+version = "0.1.0"
+description = "TW Stocker: Taiwan stock data update (daily via twstock), strategies, vectorbt backtesting, recommendations, and reporting."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "", from = "." }]
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+#twstock = "*"
+# vectorbt = "*"
+# lxml = "*"
+# fta = "*"
+# jinja2 = "*"
+# pandas = "*"
+# requests = "*"
+# nlp2 = "*"
+twstock = "^1.4.0"
+pandas = "^2.3.3"
+pytz = "^2025.2"
+jinja2 = "^3.1.6"
+lxml = "^6.0.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "*"
+isort = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

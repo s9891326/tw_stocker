@@ -1,9 +1,0 @@
-twstock
-vectorbt
-lxml
-yfinance
-fta
-jinja2
-pandas
-requests
-nlp2

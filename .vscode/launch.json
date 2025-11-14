@@ -1,0 +1,39 @@
+{
+    // 使用 IntelliSense 以得知可用的屬性。
+    // 暫留以檢視現有屬性的描述。
+    // 如需詳細資訊，請瀏覽: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Program",
+            // "type": "go",
+            "type": "python",
+            "request": "launch",
+            "mode": "debug",
+            "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            // "program": "${workspaceFolder}\\svc-india_callback",
+            // "program": "${workspaceFolder}\\svc-india",
+            // "program": "${workspaceFolder}\\svc-cron-statement",
+            // "program": "${workspaceFolder}\\svc-statement",
+            // "program": "${workspaceFolder}\\botMyanmar\\gcpAPI.py",
+            "program": "${workspaceFolder}\\update.py",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                // python
+                "GOOGLE_APPLICATION_CREDENTIALS": "${workspaceFolder}/botMyanmar/afagcp-6755905e864e.json",
+
+                // go
+                // "API_DSN": "root:123456@tcp(127.0.0.1:3309)/myanmardb",
+                "API_DSN": "root:inDba@1@tcp(34.47.149.169:3306)/paydb",
+                "PORT":"8011",
+                "ADDRESS": "127.0.0.1",
+                "API_ADDR_FED": "34.47.149.169:8900",
+                "API_ADDR_KBL": "34.47.149.169:8710",
+                "LOG_LEVEL": "debug",
+                "CALLBACK_IP": "127.0.0.1",
+                "X-SERVICE-CODE": "11111111",
+                "DEFAULT_TZ": "Asia/Shanghai",
+            }
+        }
+    ]
+}

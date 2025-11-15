@@ -54,53 +54,32 @@ def _read_and_clean_csv(path_or_url: str | Path) -> pd.DataFrame:
 
     Accepts both local paths and URLs.
     """
-    potential_index_cols = ["Datetime", "datetime", "date", "Date"]
-    df: pd.DataFrame | None = None
-
-    for idx_col in potential_index_cols:
-        try:
-            df = pd.read_csv(path_or_url, index_col=idx_col)
-            break
-        except Exception:
-            continue
-
-    if df is None:
-        df = pd.read_csv(path_or_url)
-        dt_candidate = None
-        for c in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[c]):
-                dt_candidate = c
-                break
-        if dt_candidate is None:
-            for c in potential_index_cols:
-                if c in df.columns:
-                    dt_candidate = c
-                    break
-        if dt_candidate is None:
-            raise ValueError(f"No datetime column found in: {path_or_url}")
-        df = df.set_index(dt_candidate)
-
+    # 1. 讀取並標準化欄位名稱
+    df = pd.read_csv(
+        path_or_url, 
+        index_col="datetime",
+        parse_dates=["datetime"] # 讓 C-Parser 處理時間字串
+    )
     df.rename(columns=lambda c: str(c).lower(), inplace=True)
 
+    # 2. 檢查缺失欄位
     missing = sorted(REQUIRED_COLS - set(df.columns))
     if missing:
         raise ValueError(f"Missing columns {missing} in: {path_or_url}")
 
-    for c in ["open", "high", "low", "close", "volume"]:
+    # 3. 數值轉換 (使用 REQUIRED_COLS 確保一致性)
+    # 假設 REQUIRED_COLS 包含所有需要轉數值的欄位
+    for c in REQUIRED_COLS:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = df[~df["close"].isna()].copy()
+    # 4. 清洗：濾除 Close 欄位為 NaN 的數據，並處理重複索引
+    # 使用 .loc 避免 SettingWithCopyWarning
+    df = df.loc[~df["close"].isna()]
+    df = df.loc[~df.index.duplicated(keep="last")]
 
+    # 5. 時區處理
     df.index = _tz_aware_daily_index(df.index)
-
-    df = df[~df.index.duplicated(keep="last")]
-
-    df.sort_index(inplace=True)
-
-    daily = df.resample('1D').last()
-    daily = daily[~daily.index.duplicated(keep='last')]
-    daily.sort_index(inplace=True)
-    return daily
+    return df.sort_index()
 
 
 def _run_strategy(df: pd.DataFrame, parameters: Dict) -> Tuple[List[int], List[int], List[bool], List[bool], float, float]:
@@ -162,6 +141,8 @@ def generate_report(urls: Iterable[str | Path], parameters: Dict, limit: int = 1
             should_buy, should_sell, today_close_price, total_gains = recommend_stock(str(url), parameters)
             if should_sell or should_buy:
                 stock_name = str(url).split("/")[-1].split(".")[0]
+                if isinstance(url, Path):
+                    stock_name = url.parts[-1].split(".")[0]
                 results.append({
                     "Stock": stock_name,
                     "Should_Buy": bool(should_buy),
@@ -207,15 +188,15 @@ def main() -> None:
     data_files = _iter_data_files("data")
 
     # Print picks to stdout
-    # for p in data_files:
-    #     try:
-    #         should_buy, should_sell, today_close_price, total_gains = recommend_stock(str(p), parameters)
-    #         if should_sell or should_buy:
-    #             stock = p.stem
-    #             print(f"{stock} Should buy today: {should_buy}, Should sell today: {should_sell}, Recommended price: {today_close_price}, total_gains:{total_gains}")
-    #     except Exception:
-    #         traceback.print_exc(file=sys.stderr)
-    #         continue
+    for p in data_files:
+        try:
+            should_buy, should_sell, today_close_price, total_gains = recommend_stock(str(p), parameters)
+            if should_sell or should_buy:
+                stock = p.stem
+                print(f"{stock} Should buy today: {should_buy}, Should sell today: {should_sell}, Recommended price: {today_close_price}, total_gains:{total_gains}")
+        except Exception:
+            traceback.print_exc(file=sys.stderr)
+            continue
 
     # Generate report
     generate_report(data_files, parameters, limit=10, output_path="stock_report.html")

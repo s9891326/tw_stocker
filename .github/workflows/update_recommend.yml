@@ -22,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install poetry
-          poetry install
+          poetry install --no-root
 
       - name: Pull changes from remote
         run: git pull origin main
 
       - name: Update data
-        run: python recommend.py
+        run: poetry run python recommend.py
 
       - name: Commit and push if changes
         run: |

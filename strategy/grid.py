@@ -2,6 +2,31 @@ import pandas as pd
 import numpy as np
 
 def trade(real_movement, initial_money=10000, rsi_period=14, low_rsi=30, high_rsi=70, ema_period=26, print_log=False):
+    """
+    基於RSI和布林通道的模擬交易回測函式。
+    策略分析：RSI 結合布林通道
+
+    1. 買入訊號（超賣區逆轉）當以下兩個條件同時成立時，觸發買入：
+        RSI 超賣： 股價在過去 $14$ 週期（預設）內跌幅過大，RSI < 30 (超賣區間)。
+        布林通道確認： 股價跌至極端，收盤價 < 布林通道下軌。
+        意義： 認為股價短期內被嚴重超賣，並且已經跌到了 $20$ 週期標準差以外的極端低點，屬於強烈的買入機會（逆勢操作）。
+    2. 賣出訊號（超買區逆轉）當以下兩個條件同時成立時，觸發賣出：
+        RSI 超買： 股價在過去 $14$ 週期內（預設）漲幅過大，RSI > 70 (超買區間)。
+        布林通道確認： 股價漲至極端，收盤價 > 布林通道上軌。
+        意義： 認為股價短期內被嚴重超買，並且已經漲到了 $20$ 週期標準差以外的極端高點，屬於強烈的賣出機會（逆勢操作）。
+
+    Args:
+        real_movement (pd.DataFrame): 包含 'close' 欄位的股價數據。
+        initial_money (int): 初始資金。
+        rsi_period (int): 計算RSI所使用的週期 (K線數量)。
+        low_rsi (int): RSI超賣區間下限，低於此值可能視為買入訊號。
+        high_rsi (int): RSI超買區間上限，高於此值可能視為賣出訊號。
+        ema_period (int): 計算EMA所使用的週期。
+        print_log (bool): 是否打印交易日誌。
+
+    Returns:
+        tuple: (states_buy, states_sell, states_entry, states_exit, total_gains, invest)
+    """
     money = initial_money
     states_buy = []
     states_sell = []

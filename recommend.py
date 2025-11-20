@@ -22,6 +22,7 @@ from typing import Dict, Iterable, List, Tuple
 import pandas as pd
 import pytz
 from jinja2 import Environment, FileSystemLoader
+import twstock
 
 from strategy.grid import trade as grid_trade
 
@@ -128,6 +129,17 @@ def recommend_stock(path_or_url: str, parameters: Dict) -> Tuple[bool, bool, flo
     return should_buy, should_sell, today_close_price, float(total_gains)
 
 
+def _symbol_to_display(symbol: str) -> str:
+    # Map numeric ticker (e.g., '2330') to its company name via twstock.codes
+    try:
+        meta = twstock.codes.get(symbol)
+        if meta and getattr(meta, 'name', None):
+            return f"{meta.name}({symbol})"
+    except Exception:
+        pass
+    return symbol
+
+
 def generate_report(urls: Iterable[str | Path], parameters: Dict, limit: int = 10, output_path: str | Path = "stock_report.html") -> None:
     """Aggregate recommendations and render an HTML report using Jinja2.
 
@@ -140,9 +152,10 @@ def generate_report(urls: Iterable[str | Path], parameters: Dict, limit: int = 1
         try:
             should_buy, should_sell, today_close_price, total_gains = recommend_stock(str(url), parameters)
             if should_sell or should_buy:
-                stock_name = str(url).split("/")[-1].split(".")[0]
+                stock_code = str(url).split("/")[-1].split(".")[0]
                 if isinstance(url, Path):
-                    stock_name = url.parts[-1].split(".")[0]
+                    stock_code = url.parts[-1].split(".")[0]
+                stock_name = _symbol_to_display(stock_code)
                 results.append({
                     "Stock": stock_name,
                     "Should_Buy": bool(should_buy),

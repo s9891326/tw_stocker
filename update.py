@@ -1,20 +1,18 @@
-from datetime import datetime, date, timedelta
-import os
-import time
 import argparse
-from typing import List, Tuple, Optional, Iterable
+import json
+import os
+import random
+import time
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime, timedelta
+from typing import Iterable, List, Optional, Tuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytz
 import twstock
-import urllib.request
-import urllib.parse
-import json
-import time
-import random
-
 
 TAIPEI_TZ = pytz.timezone("Asia/Taipei")
 DATA_DIR = "./data/"
@@ -179,7 +177,7 @@ def _acquire_file_lock(lock_path: str, timeout: float = 30.0) -> Optional[int]:
                 pass
             return fd
         except FileExistsError:
-            time.sleep(0.05 + random.uniform(0, 0.1))
+            time.sleep(random.uniform(1, 3))
         except Exception:
             break
     return None
@@ -248,6 +246,8 @@ def _twse_get_json(
     url = f"{base}{path}?{qs}"
 
     cache_file = _cache_key(path, params)
+
+    # First check without lock for speed
     if use_cache and os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
@@ -257,22 +257,38 @@ def _twse_get_json(
 
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
+        fd = None
         try:
-            # Cross-process rate limit to avoid TWSE IP blocking
-            # This acts as a barrier: only one process proceeds at a time
-            _twse_rate_limit_sleep()
+            # Acquire lock to serialize requests and prevent redundant fetching
+            # We use the same lock file for all TWSE requests to respect rate limits AND prevent race conditions
+            fd = _acquire_file_lock(_TWSE_LOCK_PATH, timeout=30.0)
 
-            # Double-check locking:
-            # Another thread/process might have fetched and cached the file while we were waiting
-            if use_cache and os.path.exists(cache_file):
-                try:
-                    with open(cache_file, "r", encoding="utf-8") as f:
-                        print(f"Cache hit after wait: {cache_file}")
-                        return json.load(f)
-                except Exception:
-                    pass
+            result = double_check_cache(use_cache)
+            if result:
+                return result
 
-            # Rotate User-Agent
+            # Check rate limit timestamp
+            now = time.time()
+            last = None
+            try:
+                if os.path.exists(_TWSE_TS_PATH):
+                    with open(_TWSE_TS_PATH, "r", encoding="utf-8") as f:
+                        s = f.read().strip()
+                        if s:
+                            last = float(s)
+            except Exception:
+                pass
+
+            if last is not None:
+                gap = now - last
+                if gap < TWSE_MIN_INTERVAL_SEC:
+                    time.sleep(TWSE_MIN_INTERVAL_SEC - gap + random.uniform(0, 0.05))
+
+            result = double_check_cache(use_cache)
+            if result:
+                return result
+
+            # Fetch
             ua = random.choice(USER_AGENTS)
             req = urllib.request.Request(
                 url,
@@ -288,6 +304,14 @@ def _twse_get_json(
             with urllib.request.urlopen(req, timeout=15) as resp:
                 print(f"TWSE request URL: {url} (status={resp.status})")
                 data = resp.read()
+
+            # Update timestamp
+            try:
+                with open(_TWSE_TS_PATH, "w", encoding="utf-8") as f:
+                    f.write(str(time.time()))
+            except Exception:
+                pass
+
             js = json.loads(data)
             if use_cache:
                 try:
@@ -295,11 +319,9 @@ def _twse_get_json(
                         json.dump(js, f, ensure_ascii=False)
                 except Exception:
                     pass
-            # jittered exponential backoff
-            sleep_s = backoff + random.uniform(0, 5)
-            time.sleep(sleep_s)
-            backoff = min(backoff * 2, 8)
+
             return js
+
         except Exception as e:
             if attempt == max_retries:
                 print(f"TWSE request failed after {max_retries} attempts: {e}")
@@ -308,7 +330,22 @@ def _twse_get_json(
             sleep_s = backoff + random.uniform(0, 0.5)
             time.sleep(sleep_s)
             backoff = min(backoff * 2, 8)
+        finally:
+            _release_file_lock(fd, _TWSE_LOCK_PATH)
+
     return {}
+
+
+def double_check_cache(use_cache: bool = True):
+    # Double-check cache after acquiring lock
+    if use_cache and os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                print(f"Cache hit after wait: {cache_file}")
+                return json.load(f)
+        except Exception:
+            pass
+    return None
 
 
 def _fetch_t86_by_date(yyyymmdd: str) -> pd.DataFrame:
@@ -401,6 +438,13 @@ def load_existing(csv_path: str) -> pd.DataFrame:
         return pd.DataFrame(columns=CSV_COLUMNS)
 
     df.columns = [c.strip().lower() for c in df.columns]
+
+    # Remove corrupted columns from previous bad merges
+    cols_to_keep = [
+        c for c in df.columns if not c.endswith("_x") and not c.endswith("_y")
+    ]
+    df = df[cols_to_keep]
+
     if "datetime" not in df.columns:
         if "date" in df.columns:
             df = df.rename(columns={"date": "datetime"})
@@ -457,32 +501,36 @@ def get_daily_data_since_last_record(
         start = date(next_day.year, next_day.month, 1)
 
     if (not existing.empty) and start > today:
-        return pd.DataFrame(columns=CSV_COLUMNS)
+        # Even if we don't fetch new price data, we might need to backfill institutional data
+        # But for simplicity, let's assume if price is up to date, we check institutional data
+        pass
 
     frames: List[pd.DataFrame] = []
-    for y, m in month_range(start, today):
-        try:
-            dfm = _retry_fetch_month(stock_num, y, m)
-            frames.append(dfm)
-        except Exception as e:
-            print(f"Warning: failed to fetch {stock_num} {y}-{m:02d}: {e}")
+    # Only fetch new price data if needed
+    if start <= today:
+        for y, m in month_range(start, today):
+            try:
+                dfm = _retry_fetch_month(stock_num, y, m)
+                frames.append(dfm)
+            except Exception as e:
+                print(f"Warning: failed to fetch {stock_num} {y}-{m:02d}: {e}")
 
-    if not frames:
-        return pd.DataFrame(columns=CSV_COLUMNS)
-
-    new_df = pd.concat(frames, ignore_index=True)
+    new_df = pd.DataFrame(columns=CSV_COLUMNS)
+    if frames:
+        new_df = pd.concat(frames, ignore_index=True)
 
     # only keep strictly new rows compared to existing
-    if not existing.empty:
+    if not existing.empty and not new_df.empty:
         last_dt = existing["datetime"].iloc[-1]
         new_df = new_df[new_df["datetime"] > last_dt]
 
-    new_df = new_df.dropna(subset=["close"])
-    new_df = (
-        new_df.drop_duplicates(subset=["datetime"])
-        .sort_values("datetime")
-        .reset_index(drop=True)
-    )
+    if not new_df.empty:
+        new_df = new_df.dropna(subset=["close"])
+        new_df = (
+            new_df.drop_duplicates(subset=["datetime"])
+            .sort_values("datetime")
+            .reset_index(drop=True)
+        )
 
     # Combine existing price data with new price data first
     combined = pd.concat([existing, new_df], ignore_index=True)
@@ -492,24 +540,55 @@ def get_daily_data_since_last_record(
         .reset_index(drop=True)
     )
 
-    # Decide which dates to fetch institutional data for (avoid refetching entire history)
-    if not new_df.empty:
-        dates_for_fetch = new_df["datetime"]
-    elif not existing.empty:
-        # small backfill window when no new prices (e.g., re-run same day)
-        dates_for_fetch = existing["datetime"].tail(5)
-    else:
-        # first-time backfill: fetch for all dates in combined
-        dates_for_fetch = combined["datetime"]
+    # Decide which dates to fetch institutional data for
+    # We want to fetch for new data AND potentially backfill recent missing data
+    # For simplicity, let's fetch for the new_df dates + last 5 days of existing
+    dates_for_fetch = pd.Series(dtype="datetime64[ns, Asia/Taipei]")
 
-    # Merge TWSE institutional data
-    inst_df = _fetch_institutional_for_dates(stock_num, dates_for_fetch)
-    if not inst_df.empty:
-        combined = pd.merge(combined, inst_df, on="datetime", how="left")
-    else:
-        for c in INSTITUTIONAL_COLS:
-            if c not in combined.columns:
-                combined[c] = np.nan
+    if not new_df.empty:
+        dates_for_fetch = pd.concat([dates_for_fetch, new_df["datetime"]])
+
+    if not existing.empty:
+        # Check last few days of existing to see if they have institutional data
+        # If not, add them to fetch list
+        tail = existing.tail(10)
+        missing_inst = (
+            tail[tail[INSTITUTIONAL_COLS[0]].isna()]
+            if INSTITUTIONAL_COLS[0] in tail.columns
+            else tail
+        )
+        if not missing_inst.empty:
+            dates_for_fetch = pd.concat([dates_for_fetch, missing_inst["datetime"]])
+        else:
+            # Always re-check last 3 days just in case data wasn't available then
+            dates_for_fetch = pd.concat([dates_for_fetch, existing["datetime"].tail(3)])
+
+    dates_for_fetch = dates_for_fetch.drop_duplicates().sort_values()
+
+    if not dates_for_fetch.empty:
+        inst_df = _fetch_institutional_for_dates(stock_num, dates_for_fetch)
+
+        if not inst_df.empty:
+            # Use update logic instead of merge to avoid duplicates
+            # Ensure columns exist
+            for col in INSTITUTIONAL_COLS:
+                if col not in combined.columns:
+                    combined[col] = np.nan
+
+            # Set index for update
+            combined.set_index("datetime", inplace=True)
+            inst_df.set_index("datetime", inplace=True)
+
+            # Update combined with inst_df values
+            combined.update(inst_df)
+
+            # Reset index
+            combined.reset_index(inplace=True)
+
+    # Ensure columns exist if no fetch happened
+    for c in INSTITUTIONAL_COLS:
+        if c not in combined.columns:
+            combined[c] = np.nan
 
     if not combined.empty:
         out_df = combined.copy()

@@ -16,17 +16,20 @@
             // "program": "${workspaceFolder}\\svc-cron-statement",
             // "program": "${workspaceFolder}\\svc-statement",
             // "program": "${workspaceFolder}\\botMyanmar\\gcpAPI.py",
-            "program": "${workspaceFolder}\\update.py",
-            // "program": "${workspaceFolder}\\recommend.py",
+            // "program": "${workspaceFolder}\\update.py",
+            "program": "${workspaceFolder}\\recommend.py",
+            "args": [
+                "--strategy",
+                "institutional",
+            ],
             "cwd": "${workspaceFolder}",
             "env": {
                 // python
                 "GOOGLE_APPLICATION_CREDENTIALS": "${workspaceFolder}/botMyanmar/afagcp-6755905e864e.json",
-
                 // go
                 // "API_DSN": "root:123456@tcp(127.0.0.1:3309)/myanmardb",
                 "API_DSN": "root:inDba@1@tcp(34.47.149.169:3306)/paydb",
-                "PORT":"8011",
+                "PORT": "8011",
                 "ADDRESS": "127.0.0.1",
                 "API_ADDR_FED": "34.47.149.169:8900",
                 "API_ADDR_KBL": "34.47.149.169:8710",

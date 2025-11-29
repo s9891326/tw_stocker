@@ -236,12 +236,15 @@ def parse_args():
     parser.add_argument(
         "--strategy",
         type=str,
-        default="grid",
+        default="institutional",
         choices=["grid", "institutional"],
         help="Strategy to use: 'grid' or 'institutional'",
     )
     parser.add_argument(
-        "--days", type=int, default=5, help="Continuous days for institutional strategy"
+        "--days", type=int, default=3, help="Continuous days for institutional strategy"
+    )
+    parser.add_argument(
+        "--window", type=int, default=1, help="Signal window for institutional strategy"
     )
     return parser.parse_args()
 
@@ -254,6 +257,8 @@ def main() -> None:
         "low_rsi": 30,
         "high_rsi": 70,
         "ema_period": 26,
+        "continuous_days": args.days,
+        "signal_window": args.window,
     }
 
     data_files = _iter_data_files("data")

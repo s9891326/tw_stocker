@@ -496,13 +496,10 @@ def get_daily_data_since_last_record(
     else:
         last_dt: datetime = existing["datetime"].iloc[-1]
         last_day = last_dt.date()
-        # next calendar month from the last recorded day
         next_day = last_day + timedelta(days=1)
         start = date(next_day.year, next_day.month, 1)
 
     if (not existing.empty) and start > today:
-        # Even if we don't fetch new price data, we might need to backfill institutional data
-        # But for simplicity, let's assume if price is up to date, we check institutional data
         pass
 
     frames: List[pd.DataFrame] = []

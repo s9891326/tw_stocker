@@ -71,12 +71,10 @@ def trade(
             if foreign[i] < 0 or trust[i] < 0:
                 is_sell_signal = True
 
-        # Execute Trade Logic
         price = close_prices[i]
 
         if holding:
             if is_sell_signal:
-                # Sell everything
                 revenue = shares * price
                 cost = revenue * (fee_rate + tax_rate)
                 current_money += revenue - cost
@@ -85,11 +83,9 @@ def trade(
                 states_sell.append(i)
                 states_exit[i] = True
             else:
-                # Keep holding
                 states_entry[i] = True
         else:
             if is_buy_signal:
-                # Buy as much as possible
                 cost_per_share = price * (1 + fee_rate)
                 if current_money > cost_per_share:
                     buy_shares = int(current_money // cost_per_share)

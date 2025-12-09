@@ -247,6 +247,17 @@ def _twse_get_json(
 
     cache_file = _cache_key(path, params)
 
+    def double_check_cache(use_cache: bool = True):
+        # Double-check cache after acquiring lock
+        if use_cache and os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    print(f"Cache hit after wait: {cache_file}")
+                    return json.load(f)
+            except Exception:
+                pass
+        return None
+
     # First check without lock for speed
     if use_cache and os.path.exists(cache_file):
         try:
@@ -334,18 +345,6 @@ def _twse_get_json(
             _release_file_lock(fd, _TWSE_LOCK_PATH)
 
     return {}
-
-
-def double_check_cache(use_cache: bool = True):
-    # Double-check cache after acquiring lock
-    if use_cache and os.path.exists(cache_file):
-        try:
-            with open(cache_file, "r", encoding="utf-8") as f:
-                print(f"Cache hit after wait: {cache_file}")
-                return json.load(f)
-        except Exception:
-            pass
-    return None
 
 
 def _fetch_t86_by_date(yyyymmdd: str) -> pd.DataFrame:

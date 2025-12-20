@@ -307,9 +307,12 @@ def _twse_get_json(
                     "User-Agent": ua,
                     "Referer": "https://www.twse.com.tw/zh/page/trading/fund/T86.html",
                     "Accept": "application/json, text/javascript, */*; q=0.01",
-                    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+                    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
                     "Connection": "keep-alive",
                     "X-Requested-With": "XMLHttpRequest",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "cors",
+                    "Sec-Fetch-Site": "same-origin",
                 },
             )
             with urllib.request.urlopen(req, timeout=15) as resp:

@@ -1,9 +1,9 @@
 name: Update Data
 
 on:
- schedule:
-   - cron: '0 6 * * *'  # 每天UTC時間6點執行，即UTC+8時間下午2點
- workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'  # 每天 UTC 14:00 (台北時間)
+  workflow_dispatch:     # 讓你可以手動點擊按鈕執行
   push:
     branches:
       - main

@@ -5,6 +5,7 @@ import random
 import time
 import urllib.parse
 import urllib.request
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from typing import Iterable, List, Optional, Tuple
@@ -13,6 +14,27 @@ import numpy as np
 import pandas as pd
 import pytz
 import twstock
+import twstock.stock
+
+# Monkey patch twstock.stock.DATATUPLE to handle extra data field from TWSE
+# Error was: Data.__new__() takes 10 positional arguments but 11 were given
+# 10 args = 9 fields + 1 cls. 11 args = 10 fields + 1 cls.
+# So we need 10 fields (original 9 + 1 extra).
+twstock.stock.DATATUPLE = namedtuple(
+    "Data",
+    [
+        "date",
+        "capacity",
+        "turnover",
+        "open",
+        "high",
+        "low",
+        "close",
+        "change",
+        "transaction",
+        "unknown",  # Added field to handle extra data
+    ],
+)
 
 TAIPEI_TZ = pytz.timezone("Asia/Taipei")
 DATA_DIR = "./data/"
